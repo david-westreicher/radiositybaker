@@ -5,10 +5,16 @@ requirejs(
     [
         three+'build/three.js',
         threejs+'Detector.js',
-        threejs+'libs/stats.min.js'
+        threejs+'libs/stats.min.js',
     ],
     function(){
         console.log('all loaded');
-        requirejs(['js/render.js']);
+        requirejs([
+                threejs+'controls/OrbitControls.js',
+                'js/render.js'
+            ],
+            function(renderer){
+                console.log(renderer);
+            });
     }
 );
