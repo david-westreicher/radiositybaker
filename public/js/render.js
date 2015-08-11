@@ -14,6 +14,7 @@ var globaltex = null;
 var rttex = null;
 var rttexbuf = null;
 var rtsize = 16;
+var bigrtsize = 2048;
 var frame = 0;
 var currentpos = {x:0,y:0};
 var bigFrame = null;
@@ -113,7 +114,7 @@ function init(cubes) {
 
     rttexbuf = new THREE.DataTexture(new Uint8Array(4*rtsize*rtsize),rtsize,rtsize,THREE.RGBAFormat);
     rttex = new THREE.WebGLRenderTarget(rtsize,rtsize, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } );
-    bigFrame = new THREE.WebGLRenderTarget(2048,2048, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } );
+    bigFrame = new THREE.WebGLRenderTarget(bigrtsize,bigrtsize, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } );
 
     camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 100 );
     radcam = new THREE.PerspectiveCamera( 90, 1, 0.1, 100 );
