@@ -45,7 +45,7 @@ var maps = function(size){
     }
 
 
-    self.plotIntoMaps = function(newtri,verts){
+    self.plotIntoMaps = function(newtri,verts,col){
         var offset = 2;
         var tempgeom = new THREE.Geometry();
         newtri.forEach(function(vert){
@@ -64,11 +64,9 @@ var maps = function(size){
                 var y = sy+bbox.min.y-offset;
                 var arrx = space[0]+sx;
                 var arry = space[1]+sy;
-                if(arrx==0 && arry ==0)
-                    console.log(normal,verts);
                 self.maps[0][space[0]+sx][space[1]+sy] = self.interpPos(new THREE.Vector3(x,y,0),newtri,verts);
                 self.maps[1][space[0]+sx][space[1]+sy] = normal;
-                self.maps[2][space[0]+sx][space[1]+sy] = Math.random()*0xffffff;
+                self.maps[2][space[0]+sx][space[1]+sy] = col;
             }
 
         for(var i=0;i<3;i++)
