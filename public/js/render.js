@@ -3,21 +3,25 @@ if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 var container, stats;
 var globalmaps = null;
 
-var size = 512;
+var size = 256;
+var tileSize = 32;
+var plane = null;
+
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
+    plane = new THREE.PlaneGeometry(10,10);
     init(scenes.small);
     animate();
 });
-var radcam, camera, controls, radscene, scene, renderer;
-var globaltex = null;
-var rttex = null;
-var rttexbuf = null;
-var rtsize = 16;
-var bigrtsize = 2048;
+var radcam, camera, controls, radscene, scene, renderer,orthoscene;
+var renderTarget = {
+    size:1024,
+    rt: null,
+    col: null
+}
+var downsampler = [];
 var frame = 0;
 var currentpos = {x:0,y:0};
-var bigFrame = null;
 
 function flatten(v1,v2,v3){
     /*
@@ -45,6 +49,28 @@ function colToVec(col){
     return new THREE.Vector3(col.r,col.g,col.b);
 }
 
+function createDownSampler(scene){
+    var currentSize = renderTarget.size;
+    var num = 0;
+    while(currentSize>renderTarget.size/tileSize){
+        currentSize/=2;
+        var rt = new THREE.WebGLRenderTarget(currentSize,currentSize, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat } );
+        rt.generateMipmaps = true;
+
+        var dsscene = new THREE.Scene();
+        var rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: (num==0?renderTarget.rt:downsampler[downsampler.length-1].rt)}));
+        rendertotexplane.material.side = THREE.DoubleSide;
+        dsscene.add(rendertotexplane);
+        downsampler.push({scene:dsscene,rt:rt});
+
+        rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: rt}));
+        rendertotexplane.position.x = 60 + 10*num++;
+        rendertotexplane.position.y = 50;
+        scene.add(rendertotexplane);
+    }
+    console.log(downsampler);
+}
+
 function createScene(scene,cubes){
     var newscene = cubes;
     var material = new THREE.MeshBasicMaterial({color:Math.random()*0xffffff});
@@ -70,59 +96,49 @@ function createScene(scene,cubes){
         });
     });
 
-    var texdat = new Uint8Array(size*size*3);
-    for(var x =0;x<=size;x++){
-        for(var y =0;y<=size;y++){
-            var dataIndex = (x+y*size)*3;
-            texdat[dataIndex+0]= 0;
-            texdat[dataIndex+1]= 0;
-            texdat[dataIndex+2]= 0;
-        }
-    }
-    var finaltex = new THREE.DataTexture(texdat,size,size,THREE.RGBFormat);
-    //finaltex.magFilter = finaltex.minFilter = THREE.NearestFilter;
-    finalgeom.uvsNeedUpdate = true;
-    finaltex.needsUpdate = true;
-    globaltex = finaltex;
-    var finalmesh = new THREE.Mesh( finalgeom, new THREE.MeshBasicMaterial( {map: finaltex} ) );
+    var finalmesh = new THREE.Mesh( finalgeom, new THREE.MeshBasicMaterial( {map: renderTarget.col} ) );
     scene.add(finalmesh);
-    finalmesh = new THREE.Mesh( finalgeom, new THREE.MeshBasicMaterial( {map: finaltex} ) );
+    finalmesh = new THREE.Mesh( finalgeom, new THREE.MeshBasicMaterial( {map: renderTarget.col} ) );
     radscene.add(finalmesh);
     var blackmat = new THREE.MeshBasicMaterial( {color: 0x000000} );
     blackmat.side = THREE.BackSide;
     finalmesh = new THREE.Mesh( finalgeom, blackmat);
     radscene.add(finalmesh);
 
-    var plane = new THREE.PlaneGeometry(10,10)
-    var rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: finaltex}));
+    var rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: renderTarget.col}));
     rendertotexplane.position.x = 20;
     rendertotexplane.position.y = 50;
     scene.add(rendertotexplane);
-    rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: rttex}));
-    rendertotexplane.position.x = 0;
-    rendertotexplane.position.y = 50;
-    scene.add(rendertotexplane);
-    rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: bigFrame}));
+    rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: renderTarget.rt}));
     rendertotexplane.position.x = 40;
     rendertotexplane.position.y = 50;
     scene.add(rendertotexplane);
+
 }
 
 function init(cubes) {
 
     container = document.getElementById( 'container' );
 
-    rttexbuf = new THREE.DataTexture(new Uint8Array(4*rtsize*rtsize),rtsize,rtsize,THREE.RGBAFormat);
-    rttex = new THREE.WebGLRenderTarget(rtsize,rtsize, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } );
-    bigFrame = new THREE.WebGLRenderTarget(bigrtsize,bigrtsize, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } );
+    renderTarget.col = new THREE.WebGLRenderTarget(size,size, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat } );
+
+    renderTarget.rt = new THREE.WebGLRenderTarget(renderTarget.size,renderTarget.size, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat } );
 
     camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 100 );
     radcam = new THREE.PerspectiveCamera( 90, 1, 0.1, 100 );
+    orthocam = new THREE.OrthographicCamera(-5,5,5,-5,-1,1);
     camera.position.z = 30;
     controls = new THREE.OrbitControls( camera );
 
     scene = new THREE.Scene();
     radscene = new THREE.Scene();
+    orthoscene = new THREE.Scene();
+    createDownSampler(scene);
+    var rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: downsampler[downsampler.length-1].rt}));
+    rendertotexplane.material.side = THREE.DoubleSide;
+    orthoscene.add(rendertotexplane);
+    //orthoscene.add(new THREE.Mesh(new THREE.BoxGeometry(2,2,2),new THREE.MeshBasicMaterial({color:0x00ff00})));
+
     createScene(scene,cubes);
 
     renderer = new THREE.WebGLRenderer( { antialias: false } );
@@ -155,29 +171,6 @@ function animate() {
     stats.update();
 }
 
-function increasepos(){
-    currentpos.x++;
-    if(currentpos.x==size){
-        currentpos.x = 0;
-        currentpos.y++;
-        if(currentpos.y==size)
-            currentpos.y = 0;
-    }
-}
-
-function setRadCamPos(){
-    increasepos();
-    var maps = globalmaps.maps;
-    while(maps[0][currentpos.x][currentpos.y] == null)
-        increasepos();
-    var x = currentpos.x;
-    var y = currentpos.y;
-    radcam.position.copy(maps[0][x][y]);
-    var lookat = new THREE.Vector3().copy(radcam.position).add(maps[1][x][y]);
-    radcam.lookAt(lookat);
-    //scene.add(new THREE.ArrowHelper( globalmaps[1][x][y], radcam.position, 2, frame*0x00000f ));
-}
-
 function getCol(dat){
     var col = new THREE.Vector3();
     var norm = 1.0/(rtsize*rtsize);
@@ -193,40 +186,60 @@ function getCol(dat){
     return col;
 }
 
+function downsample(){
+    downsampler.forEach(function(ds){
+        renderer.setRenderTarget(ds.rt);
+        renderer.setViewport(0,0,ds.rt.width,ds.rt.height);
+        renderer.render( ds.scene, orthocam, ds.rt );
+    });
+}
+
 function render() {
 
-    //if(frame%2==0)
-    for(var i = 0;i<10;i++){
-        //render into texture
-        setRadCamPos();
-        renderer.render( radscene, radcam, rttex );
-        //download rendered texture
-        var gl = renderer.getContext();
-        var dat = rttexbuf.image.data;
-        gl.readPixels(0, 0, rtsize, rtsize, gl.RGBA, gl.UNSIGNED_BYTE, dat);
-        var col = getCol(dat);
-        //var col = new THREE.Vector3(255,255,255);
-        if(globaltex){
-            var imdat = globaltex.image.data;
-            var index = ((size-currentpos.y)*size+currentpos.x-1)*3;
-            col.x = col.x|0;
-            col.y = col.y|0;
-            col.z = col.z|0;
-            col.multiply(globalmaps.maps[2][currentpos.x][currentpos.y]);
-
-            var diff = 0;
-            diff+= Math.abs(imdat[index+0] - col.x);
-            diff+= Math.abs(imdat[index+1] - col.y);
-            diff+= Math.abs(imdat[index+2] - col.z);
-            imdat[index+0] = col.x|0;
-            imdat[index+1] = col.y|0;
-            imdat[index+2] = col.z|0;
-            if(diff==0 && col.length()>255){
-                globalmaps.maps[0][currentpos.x][currentpos.y] = null;
-            }
+    var maps = globalmaps.maps;
+    var tiles = renderTarget.size/tileSize;
+    renderer.enableScissorTest(true);
+    
+    var allzero = true;
+    for(var x = currentpos.x;x<size && x<currentpos.x+tiles;x++){
+        for(var y = currentpos.y;y<size && y<currentpos.y+tiles;y++){
+            var pos = maps[0][x][y];
+            if(pos==null)
+                continue;
+            radcam.position.copy(pos);
+            var lookat = new THREE.Vector3().copy(radcam.position).add(maps[1][x][y]);
+            radcam.lookAt(lookat);
+            renderer.setRenderTarget(renderTarget.rt);
+            renderer.setViewport((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
+            renderer.setScissor((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
+            renderer.render( radscene, radcam, renderTarget.rt );
+            allzero = false;
         }
     }
-    globaltex.needsUpdate = true;
+
+
+    renderer.enableScissorTest(false);
+    if(!allzero){
+        downsample();
+        renderer.enableScissorTest(true);
+
+        renderer.setRenderTarget(renderTarget.col);
+        renderer.setViewport(currentpos.x,currentpos.y,tiles,tiles);
+        renderer.setScissor(currentpos.x,currentpos.y,tiles,tiles);
+        renderer.render( orthoscene, orthocam, renderTarget.col );
+
+        renderer.enableScissorTest(false);
+    }
+    currentpos.x+=tiles;
+    if(currentpos.x>=size){
+        currentpos.x = 0;
+        currentpos.y+=tiles;
+    }
+    if(currentpos.y>=size){
+        currentpos.x = 0;
+        currentpos.y = 0;
+    }
+    renderer.setViewport(0,0, window.innerWidth, window.innerHeight );
     renderer.render( scene, camera );
     frame++;
 }
