@@ -22,7 +22,6 @@ function getgeoms(material){
     cube.position.y = size/2;
     cube.position.x = size/2;
     newscene.push(cube);
-/*
     material = new THREE.MeshBasicMaterial({color:Math.random()*0xffffff});
     cube = new THREE.Mesh( new THREE.CylinderGeometry( size/4, size/4, size/2, 12 ),material);
     cube.position.y = size*0.75;
@@ -30,7 +29,7 @@ function getgeoms(material){
     material = new THREE.MeshBasicMaterial({color:Math.random()*0xffffff});
     cube = new THREE.Mesh(new THREE.IcosahedronGeometry(size/2),material);
     cube.position.y = -size/3;
-    newscene.push(cube);*/
+    newscene.push(cube);
     return newscene;
 }
 

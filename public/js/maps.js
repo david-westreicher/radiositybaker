@@ -70,7 +70,7 @@ var maps = function(size){
             }
 
         for(var i=0;i<3;i++)
-            uvs.push(new THREE.Vector2(newtri[i].x+space[0]+1.5,newtri[i].y+space[1]+1.5).multiplyScalar(1/self.size));
+            uvs.push(new THREE.Vector2(newtri[i].x+space[0]+2.5,newtri[i].y+space[1]+2.5).multiplyScalar(1/self.size));
         return {space:space,normal:normal,uvs:uvs};
     }
 }

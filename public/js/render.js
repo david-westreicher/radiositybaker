@@ -3,9 +3,10 @@ if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 var container, stats;
 var globalmaps = null;
 
-var size = 256;
-var tileSize = 32;
+var size = 512;
+var tileSize = 16;
 var plane = null;
+var debugscene = null;
 
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
@@ -15,7 +16,7 @@ require(['js/maps.js','js/scenes.js'],function(map,scenes){
 });
 var radcam, camera, controls, radscene, scene, renderer,orthoscene;
 var renderTarget = {
-    size:1024,
+    size:512,
     rt: null,
     col: null
 }
@@ -120,17 +121,20 @@ function init(cubes) {
 
     container = document.getElementById( 'container' );
 
-    renderTarget.col = new THREE.WebGLRenderTarget(size,size, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat } );
+    //var filter = THREE.NearestFilter;
+    var filter = THREE.LinearFilter;
+    renderTarget.col = new THREE.WebGLRenderTarget(size,size, { minFilter: filter , magFilter: filter, format: THREE.RGBFormat } );
 
     renderTarget.rt = new THREE.WebGLRenderTarget(renderTarget.size,renderTarget.size, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat } );
 
-    camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 100 );
+    camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 500 );
     radcam = new THREE.PerspectiveCamera( 90, 1, 0.1, 100 );
     orthocam = new THREE.OrthographicCamera(-5,5,5,-5,-1,1);
     camera.position.z = 30;
     controls = new THREE.OrbitControls( camera );
 
     scene = new THREE.Scene();
+    debugscene = new THREE.Scene();
     radscene = new THREE.Scene();
     orthoscene = new THREE.Scene();
     createDownSampler(scene);
@@ -194,6 +198,17 @@ function downsample(){
     });
 }
 
+function advancepos(tiles){
+    currentpos.x+=tiles;
+    if(currentpos.x>=size){
+        currentpos.x = 0;
+        currentpos.y+=tiles;
+    }
+    if(currentpos.y>=size){
+        currentpos.x = 0;
+        currentpos.y = 0;
+    }
+}
 function render() {
 
     var maps = globalmaps.maps;
@@ -209,6 +224,7 @@ function render() {
             radcam.position.copy(pos);
             var lookat = new THREE.Vector3().copy(radcam.position).add(maps[1][x][y]);
             radcam.lookAt(lookat);
+            
             renderer.setRenderTarget(renderTarget.rt);
             renderer.setViewport((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
             renderer.setScissor((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
@@ -216,6 +232,8 @@ function render() {
             allzero = false;
         }
     }
+    //console.log(currentpos);
+        //scene.add(new THREE.ArrowHelper( maps[1][currentpos.x][currentpos.y], radcam.position, 2, 0x00ff00 ));
 
 
     renderer.enableScissorTest(false);
@@ -230,16 +248,15 @@ function render() {
 
         renderer.enableScissorTest(false);
     }
-    currentpos.x+=tiles;
-    if(currentpos.x>=size){
-        currentpos.x = 0;
-        currentpos.y+=tiles;
-    }
-    if(currentpos.y>=size){
-        currentpos.x = 0;
-        currentpos.y = 0;
-    }
+
+    //if(currentpos.y>100 && frame%100==0){}
+    //else
+    if(frame%10==0)
+    advancepos(tiles);
+    while(maps[1][currentpos.x][currentpos.y]==null)
+        advancepos(tiles);
     renderer.setViewport(0,0, window.innerWidth, window.innerHeight );
     renderer.render( scene, camera );
+    //debugscene = new THREE.Scene();
     frame++;
 }
