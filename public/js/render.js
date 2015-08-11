@@ -1,20 +1,23 @@
 if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
 var container, stats;
+var globalmaps = null;
 
+var size = 512;
+require(['js/maps.js'],function(map){
+    globalmaps = new map(size);
+    init();
+    animate();
+});
 var radcam, camera, controls, radscene, scene, renderer;
 var globaltex = null;
-var globalmaps = null;
 var rttex = null;
 var rttexbuf = null;
-var size = 512;
 var rtsize = 128;
 var frame = 0;
 var off = 0;
 var currentpos = {x:0,y:0};
 
-init();
-animate();
 
 function flatten(v1,v2,v3){
     /*
@@ -38,85 +41,6 @@ function flatten(v1,v2,v3){
     return [v1p,v2p,v3p];
 }
 
-function generateLuts(){
-    var maps = [];
-    for(var i=0;i<3;i++){
-        var map = [];
-        for(var x=0;x<size;x++){
-            var row = [];
-            for(var y=0;y<size;y++){
-                row.push(null);
-            }
-            map.push(row);
-        }
-        maps.push(map);
-    }
-    return maps;
-}
-
-function findSpace(maps,w,h){
-    var map = maps[0];
-    for(var x=0;x<size-w;x++){
-        for(var y=0;y<size-h;y++){
-            var isFree = true;
-            for(var sx=0;sx<w;sx++)
-                for(var sy=0;sy<h;sy++)
-                    if(map[x+sx][y+sy]!=null)
-                        isFree = false;
-            if(isFree)
-                return [x,y];
-        }
-    }
-    return null;
-}
-
-function interpPos(pos,tri2,tri3){
-    var bary = new THREE.Triangle(tri2[0],tri2[1],tri2[2]).barycoordFromPoint(pos);
-    var tmp1 = new THREE.Vector3().copy(tri3[0]).multiplyScalar(bary.x);
-    var tmp2 = new THREE.Vector3().copy(tri3[1]).multiplyScalar(bary.y);
-    var tmp3 = new THREE.Vector3().copy(tri3[2]).multiplyScalar(bary.z);
-    var result = new THREE.Vector3().add(tmp1).add(tmp2).add(tmp3);
-    return result;
-}
-
-function plotIntoLuts(maps,newtri,verts){
-    var offset = 2;
-    var tempgeom = new THREE.Geometry();
-    newtri.forEach(function(vert){
-        tempgeom.vertices.push(vert);
-    });
-    tempgeom.computeBoundingBox();
-    var bbox = tempgeom.boundingBox;
-    var width = Math.ceil(bbox.max.x-bbox.min.x)+offset*2;
-    var height = Math.ceil(bbox.max.y-bbox.min.y)+offset*2;
-    var space = findSpace(maps,width,height);
-    var normal = new THREE.Triangle(verts[0],verts[1],verts[2]).normal();
-    var uvs = [];
-    for(var sx=0;sx<width;sx++)
-        for(var sy=0;sy<height;sy++){
-            var x = sx+bbox.min.x-offset;
-            var y = sy+bbox.min.y-offset;
-            var arrx = space[0]+sx;
-            var arry = space[1]+sy;
-            if(arrx==0 && arry ==0)
-                console.log(normal,verts);
-            maps[0][space[0]+sx][space[1]+sy] = interpPos(new THREE.Vector3(x,y,0),newtri,verts);
-            maps[1][space[0]+sx][space[1]+sy] = normal;
-            maps[2][space[0]+sx][space[1]+sy] = Math.random()*0xffffff;
-        }
-
-    for(var i=0;i<3;i++)
-        uvs.push(new THREE.Vector2(newtri[i].x+space[0]+1.5,newtri[i].y+space[1]+1.5).multiplyScalar(1/size));
-    return {space:space,normal:normal,uvs:uvs};
-}
-
-function getCube(){
-    //return new THREE.Mesh( new THREE.DodecahedronGeometry(10), material );
-    //return new THREE.Mesh( new THREE.TorusKnotGeometry(10,3), material );
-    return new THREE.Mesh( new THREE.BoxGeometry(20,1,20),material);
-    //return new THREE.Mesh( new THREE.CylinderGeometry( 5, 5, 20, 32 ),material);
-    //return new THREE.Mesh( new THREE.IcosahedronGeometry(10),material);
-}
 function getgeoms(material,newscene){
     var cube = new THREE.Mesh(new THREE.BoxGeometry(20,1,20),material);
     newscene.push(cube);
@@ -135,8 +59,11 @@ function getgeoms(material,newscene){
     cube.position.y = 10;
     cube.position.x = 10;
     newscene.push(cube);
-    cube = new THREE.Mesh(new THREE.IcosahedronGeometry(5),material);
+    cube = new THREE.Mesh( new THREE.CylinderGeometry( 5, 5, 10, 12 ),material);
     cube.position.y = 14;
+    newscene.push(cube);
+    cube = new THREE.Mesh(new THREE.IcosahedronGeometry(10),material);
+    cube.position.y = -7;
     newscene.push(cube);
 }
 
@@ -150,16 +77,16 @@ function getgeoms2(material,newscene){
     cube.position.y = s/2;
     newscene.push(cube);
 }
+
 function getgeoms3(material,newscene){
     var cube = new THREE.Mesh( new THREE.TorusKnotGeometry(10,4), material ); 
     newscene.push(cube);
 }
+
 function createScene(scene){
-    var maps = generateLuts();
-    globalmaps = maps;
     var newscene = [];
     var material = new THREE.MeshBasicMaterial({color:Math.random()*0xffffff});
-    getgeoms3(material,newscene);
+    getgeoms(material,newscene);
 
     var newgeom = new THREE.Geometry();
     var finalgeom = new THREE.Geometry();
@@ -176,7 +103,7 @@ function createScene(scene){
 
 
             var newtri = flatten(v1,v2,v3);
-            var plotresult = plotIntoLuts(maps,newtri,[v1,v2,v3]);
+            var plotresult = globalmaps.plotIntoMaps(newtri,[v1,v2,v3]);
             newtri.forEach(function(vert){
                 newgeom.vertices.push(vert.add(new THREE.Vector3(plotresult.space[0],plotresult.space[1],0)));
             });
@@ -194,9 +121,6 @@ function createScene(scene){
     for(var x =0;x<=size;x++){
         for(var y =0;y<=size;y++){
             var dataIndex = (x+y*size)*3;
-            texdat[dataIndex+0]= (255*Math.random())|0;
-            texdat[dataIndex+1]= (255*Math.random())|0;
-            texdat[dataIndex+2]= (255*Math.random())|0;
             texdat[dataIndex+0]= 0;
             texdat[dataIndex+1]= 0;
             texdat[dataIndex+2]= 0;
@@ -219,6 +143,7 @@ function createScene(scene){
     newmesh.scale.x = newmesh.scale.y = newmesh.scale.z = 0.1;
     //scene.add(newmesh);
 
+    /*
     var pointgeom = new THREE.Geometry();
 
     for(var x=0;x<size;x++)
@@ -228,6 +153,7 @@ function createScene(scene){
                 pointgeom.vertices.push(vert);
         }
     //scene.add(new THREE.PointCloud(pointgeom,new THREE.PointCloudMaterial({color:0x00FF00,size:0.2})));
+    //*/
     var rendertotexplane = new THREE.Mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshBasicMaterial({map: finaltex}));
     rendertotexplane.position.x = 20;
     rendertotexplane.position.y = 30;
@@ -245,7 +171,7 @@ function init() {
     rttexbuf = new THREE.DataTexture(new Uint8Array(4*rtsize*rtsize),rtsize,rtsize,THREE.RGBAFormat);
     rttex = new THREE.WebGLRenderTarget(rtsize,rtsize, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } );
 
-    camera = new THREE.PerspectiveCamera( 90, window.innerWidth / window.innerHeight, 1, 100 );
+    camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 100 );
     radcam = new THREE.PerspectiveCamera( 90, 1, 0.1, 100 );
     camera.position.z = 30;
     controls = new THREE.OrbitControls( camera );
@@ -295,17 +221,16 @@ function increasepos(){
 }
 
 function setRadCamPos(){
-    if(globalmaps){
+    increasepos();
+    var maps = globalmaps.maps;
+    while(maps[0][currentpos.x][currentpos.y] == null)
         increasepos();
-        while(globalmaps[0][currentpos.x][currentpos.y] == null)
-            increasepos();
-        var x = currentpos.x;
-        var y = currentpos.y;
-        radcam.position.copy(globalmaps[0][x][y]);
-        var lookat = new THREE.Vector3().copy(radcam.position).add(globalmaps[1][x][y]);
-        radcam.lookAt(lookat);
-        //scene.add(new THREE.ArrowHelper( globalmaps[1][x][y], radcam.position, 2, frame*0x00000f ));
-    }
+    var x = currentpos.x;
+    var y = currentpos.y;
+    radcam.position.copy(maps[0][x][y]);
+    var lookat = new THREE.Vector3().copy(radcam.position).add(maps[1][x][y]);
+    radcam.lookAt(lookat);
+    //scene.add(new THREE.ArrowHelper( globalmaps[1][x][y], radcam.position, 2, frame*0x00000f ));
 }
 
 function getCol(dat){
@@ -319,7 +244,7 @@ function getCol(dat){
             col.z+=dat[index+2]*norm;
         }
     }
-    col.multiplyScalar(0.2);
+    col.multiplyScalar(0.4);
     return col;
 }
 
@@ -336,6 +261,7 @@ function render() {
         var dat = rttexbuf.image.data;
         gl.readPixels(0, 0, rtsize, rtsize, gl.RGBA, gl.UNSIGNED_BYTE, dat);
         var col = getCol(dat);
+        //var col = new THREE.Vector3(255,255,255);
         if(globaltex){
             var imdat = globaltex.image.data;
             var index = ((size-currentpos.y)*size+currentpos.x-1)*3;
