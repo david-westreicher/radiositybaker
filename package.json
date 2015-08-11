@@ -1,0 +1,16 @@
+{
+  "name": "giweb",
+  "version": "0.0.0",
+  "description": "A radiosity baker",
+  "main": "server.js",
+  "author": "David Westreicher",
+  "license": "ISC",
+  "scripts": {
+      "install" : "bower install"
+  },
+  "dependencies": {
+    "bower": "^1.4.1",
+    "express": "^4.13.3",
+    "serve-static": "^1.10.0"
+  }
+}
