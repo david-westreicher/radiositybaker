@@ -6,7 +6,6 @@ var globalmaps = null;
 var size = 512;
 var tileSize = 16;
 var plane = null;
-var debugscene = null;
 
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
@@ -23,6 +22,7 @@ var renderTarget = {
 var downsampler = [];
 var frame = 0;
 var currentpos = {x:0,y:0};
+var colmap = null;
 
 function flatten(v1,v2,v3){
     /*
@@ -97,14 +97,6 @@ function createScene(scene,cubes){
         });
     });
 
-    var finalmesh = new THREE.Mesh( finalgeom, new THREE.MeshBasicMaterial( {map: renderTarget.col} ) );
-    scene.add(finalmesh);
-    finalmesh = new THREE.Mesh( finalgeom, new THREE.MeshBasicMaterial( {map: renderTarget.col} ) );
-    radscene.add(finalmesh);
-    var blackmat = new THREE.MeshBasicMaterial( {color: 0x000000} );
-    blackmat.side = THREE.BackSide;
-    finalmesh = new THREE.Mesh( finalgeom, blackmat);
-    radscene.add(finalmesh);
 
     var rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: renderTarget.col}));
     rendertotexplane.position.x = 20;
@@ -115,11 +107,54 @@ function createScene(scene,cubes){
     rendertotexplane.position.y = 50;
     scene.add(rendertotexplane);
 
+    return finalgeom;
+}
+
+function createcolmap(){
+    var colmapdata = new Uint8Array(size*size*3);
+    for(var x =0;x<size;x++){
+        for(var y =0;y<size;y++){
+            var dataIndex = (x+(size-y-1)*size)*3;
+            var col = globalmaps.maps[0][x][y]==null?new THREE.Vector3(0,0,0):globalmaps.maps[2][x][y];
+            colmapdata[dataIndex+0]= col.x*255;
+            colmapdata[dataIndex+1]= col.y*255;
+            colmapdata[dataIndex+2]= col.z*255;
+        }
+    }
+    colmap = new THREE.DataTexture(colmapdata,size,size,THREE.RGBFormat);
+    colmap.needsUpdate = true;
+}
+
+function createShader(){
+    var shader = new THREE.ShaderMaterial({
+        uniforms: {
+            color: {type: 't', value: colmap},
+            radiance: {type: 't', value: renderTarget.col}
+        },
+        vertexShader: [
+            "varying vec2 vuv;",
+            "void main() {",
+            "   vuv = uv;",
+            "   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+            "}"
+        ].join("\n"),
+        fragmentShader:[
+            "uniform sampler2D color;",
+            "uniform sampler2D radiance;",
+            "varying vec2 vuv;",
+            "void main() {",
+            "   gl_FragColor = texture2D(color,vuv)*texture2D(radiance,vuv)*0.9;",
+            "}"
+        ].join("\n")
+    });
+    console.log(shader);
+    return shader;
 }
 
 function init(cubes) {
 
     container = document.getElementById( 'container' );
+
 
     //var filter = THREE.NearestFilter;
     var filter = THREE.LinearFilter;
@@ -134,7 +169,6 @@ function init(cubes) {
     controls = new THREE.OrbitControls( camera );
 
     scene = new THREE.Scene();
-    debugscene = new THREE.Scene();
     radscene = new THREE.Scene();
     orthoscene = new THREE.Scene();
     createDownSampler(scene);
@@ -143,7 +177,25 @@ function init(cubes) {
     orthoscene.add(rendertotexplane);
     //orthoscene.add(new THREE.Mesh(new THREE.BoxGeometry(2,2,2),new THREE.MeshBasicMaterial({color:0x00ff00})));
 
-    createScene(scene,cubes);
+    var finalgeom = createScene(scene,cubes);
+    createcolmap();
+    var shader = createShader();
+
+    rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: colmap}));
+    rendertotexplane.position.x = -20;
+    rendertotexplane.position.y = 50;
+    scene.add(rendertotexplane);
+
+    
+    
+    var finalmesh = new THREE.Mesh( finalgeom, shader );
+    scene.add(finalmesh);
+    finalmesh = new THREE.Mesh( finalgeom, shader );
+    radscene.add(finalmesh);
+    var blackmat = new THREE.MeshBasicMaterial( {color: 0x000000} );
+    blackmat.side = THREE.BackSide;
+    finalmesh = new THREE.Mesh( finalgeom, blackmat);
+    radscene.add(finalmesh);
 
     renderer = new THREE.WebGLRenderer( { antialias: false } );
     renderer.setClearColor(0xffffff);
@@ -257,6 +309,5 @@ function render() {
         advancepos(tiles);
     renderer.setViewport(0,0, window.innerWidth, window.innerHeight );
     renderer.render( scene, camera );
-    //debugscene = new THREE.Scene();
     frame++;
 }
