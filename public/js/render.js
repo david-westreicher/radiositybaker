@@ -6,6 +6,7 @@ var globalmaps = null;
 var size = 512;
 var tileSize = 16;
 var plane = null;
+var reflectivity = 0.8;
 
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
@@ -135,7 +136,7 @@ function createShader(){
             "uniform sampler2D radiance;",
             "varying vec2 vuv;",
             "void main() {",
-            "   gl_FragColor = texture2D(color,vuv)*texture2D(radiance,vuv)*0.98;",
+            "   gl_FragColor = texture2D(color,vuv)*texture2D(radiance,vuv)*"+reflectivity+";",
             "}"
         ].join("\n")
     });
@@ -181,7 +182,7 @@ function init(cubes) {
     radscene.add(new THREE.Mesh(finalgeom,new THREE.MeshBasicMaterial({color:0x000000, side:THREE.BackSide})));
 
     renderer = new THREE.WebGLRenderer( { antialias: true } );
-    renderer.setClearColor(0xcceeff);
+    renderer.setClearColor(0xffffff);
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize( window.innerWidth, window.innerHeight );
 
