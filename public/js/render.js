@@ -10,12 +10,12 @@ var plane = null;
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
     plane = new THREE.PlaneGeometry(10,10);
-    init(scenes.medium);
+    init(scenes.small);
     animate();
 });
 var radcam, camera, controls, radscene, scene, renderer,orthoscene;
 var renderTarget = {
-    size:128,
+    size:512,
     rt: null,
     col: null
 }
