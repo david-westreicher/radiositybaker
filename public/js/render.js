@@ -1,6 +1,6 @@
 if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
-var container, stats;
+var stats;
 var globalmaps = null;
 
 var size = 512;
@@ -10,17 +10,18 @@ var plane = null;
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
     plane = new THREE.PlaneGeometry(10,10);
-    init(scenes.small);
+    init(scenes.medium);
     animate();
 });
 var radcam, camera, controls, radscene, scene, renderer,orthoscene;
 var renderTarget = {
-    size:512,
+    size:128,
     rt: null,
     col: null
 }
 var downsampler = [];
 var frame = 0;
+var debugnum = 0;
 var currentpos = {x:0,y:0};
 var colmap = null;
 
@@ -50,6 +51,13 @@ function colToVec(col){
     return new THREE.Vector3(col.r,col.g,col.b);
 }
 
+function addDebugTex(tex){
+    var rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: tex}));
+    rendertotexplane.position.x = 10*debugnum++;
+    rendertotexplane.position.y = 50;
+    scene.add(rendertotexplane);
+}
+
 function createDownSampler(scene){
     var currentSize = renderTarget.size;
     var num = 0;
@@ -63,18 +71,12 @@ function createDownSampler(scene){
         rendertotexplane.material.side = THREE.DoubleSide;
         dsscene.add(rendertotexplane);
         downsampler.push({scene:dsscene,rt:rt});
-
-        rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: rt}));
-        rendertotexplane.position.x = 60 + 10*num++;
-        rendertotexplane.position.y = 50;
-        scene.add(rendertotexplane);
+        addDebugTex(rt);
+        num++;
     }
-    console.log(downsampler);
 }
 
-function createScene(scene,cubes){
-    var newscene = cubes;
-    var material = new THREE.MeshBasicMaterial({color:Math.random()*0xffffff});
+function createScene(scene,newscene){
 
     var finalgeom = new THREE.Geometry();
     var cubenum = 0;
@@ -96,16 +98,6 @@ function createScene(scene,cubes){
             finalgeom.faceVertexUvs[0].push(plotresult.uvs);
         });
     });
-
-
-    var rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: renderTarget.col}));
-    rendertotexplane.position.x = 20;
-    rendertotexplane.position.y = 50;
-    scene.add(rendertotexplane);
-    rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: renderTarget.rt}));
-    rendertotexplane.position.x = 40;
-    rendertotexplane.position.y = 50;
-    scene.add(rendertotexplane);
 
     return finalgeom;
 }
@@ -143,17 +135,15 @@ function createShader(){
             "uniform sampler2D radiance;",
             "varying vec2 vuv;",
             "void main() {",
-            "   gl_FragColor = texture2D(color,vuv)*texture2D(radiance,vuv)*0.9;",
+            "   gl_FragColor = texture2D(color,vuv)*texture2D(radiance,vuv)*0.98;",
             "}"
         ].join("\n")
     });
-    console.log(shader);
     return shader;
 }
 
 function init(cubes) {
 
-    container = document.getElementById( 'container' );
 
 
     //var filter = THREE.NearestFilter;
@@ -179,32 +169,26 @@ function init(cubes) {
 
     var finalgeom = createScene(scene,cubes);
     createcolmap();
+
+    addDebugTex(renderTarget.rt);
+    addDebugTex(renderTarget.col);
+    addDebugTex(colmap);
+    
+    
     var shader = createShader();
+    scene.add(new THREE.Mesh(finalgeom, shader));
+    radscene.add(new THREE.Mesh(finalgeom, shader));
+    radscene.add(new THREE.Mesh(finalgeom,new THREE.MeshBasicMaterial({color:0x000000, side:THREE.BackSide})));
 
-    rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: colmap}));
-    rendertotexplane.position.x = -20;
-    rendertotexplane.position.y = 50;
-    scene.add(rendertotexplane);
-
-    
-    
-    var finalmesh = new THREE.Mesh( finalgeom, shader );
-    scene.add(finalmesh);
-    finalmesh = new THREE.Mesh( finalgeom, shader );
-    radscene.add(finalmesh);
-    var blackmat = new THREE.MeshBasicMaterial( {color: 0x000000} );
-    blackmat.side = THREE.BackSide;
-    finalmesh = new THREE.Mesh( finalgeom, blackmat);
-    radscene.add(finalmesh);
-
-    renderer = new THREE.WebGLRenderer( { antialias: false } );
-    renderer.setClearColor(0xffffff);
+    renderer = new THREE.WebGLRenderer( { antialias: true } );
+    renderer.setClearColor(0xcceeff);
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize( window.innerWidth, window.innerHeight );
 
-    renderer.gammaInput = true;
-    renderer.gammaOutput = true;
+    //renderer.gammaInput = true;
+    //renderer.gammaOutput = true;
 
+    var container = document.getElementById( 'container' );
     container.appendChild( renderer.domElement );
 
     stats = new Stats();
@@ -227,21 +211,6 @@ function animate() {
     stats.update();
 }
 
-function getCol(dat){
-    var col = new THREE.Vector3();
-    var norm = 1.0/(rtsize*rtsize);
-    for(var x = 0;x<rtsize;x++){
-        for(var y = 0;y<rtsize;y++){
-            var index = (x*rtsize+y)*4;
-            col.x+=dat[index+0]*norm;
-            col.y+=dat[index+1]*norm;
-            col.z+=dat[index+2]*norm;
-        }
-    }
-    col.multiplyScalar(0.9);
-    return col;
-}
-
 function downsample(){
     downsampler.forEach(function(ds){
         renderer.setRenderTarget(ds.rt);
@@ -261,6 +230,7 @@ function advancepos(tiles){
         currentpos.y = 0;
     }
 }
+
 function render() {
 
     var maps = globalmaps.maps;
@@ -268,46 +238,38 @@ function render() {
     renderer.enableScissorTest(true);
     
     var allzero = true;
-    for(var x = currentpos.x;x<size && x<currentpos.x+tiles;x++){
-        for(var y = currentpos.y;y<size && y<currentpos.y+tiles;y++){
-            var pos = maps[0][x][y];
-            if(pos==null)
-                continue;
-            radcam.position.copy(pos);
-            var lookat = new THREE.Vector3().copy(radcam.position).add(maps[1][x][y]);
-            radcam.lookAt(lookat);
-            
-            renderer.setRenderTarget(renderTarget.rt);
-            renderer.setViewport((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
-            renderer.setScissor((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
-            renderer.render( radscene, radcam, renderTarget.rt );
-            allzero = false;
+    while(allzero){
+        for(var x = currentpos.x;x<size && x<currentpos.x+tiles;x++){
+            for(var y = currentpos.y;y<size && y<currentpos.y+tiles;y++){
+                var pos = maps[0][x][y];
+                if(pos==null)
+                    continue;
+                radcam.position.copy(pos);
+                var lookat = new THREE.Vector3().copy(radcam.position).add(maps[1][x][y]);
+                radcam.lookAt(lookat);
+                
+                renderer.setRenderTarget(renderTarget.rt);
+                renderer.setViewport((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
+                renderer.setScissor((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
+                renderer.render( radscene, radcam, renderTarget.rt );
+                allzero = false;
+            }
         }
+        if(allzero)
+            advancepos(tiles);
     }
-    //console.log(currentpos);
-        //scene.add(new THREE.ArrowHelper( maps[1][currentpos.x][currentpos.y], radcam.position, 2, 0x00ff00 ));
-
 
     renderer.enableScissorTest(false);
-    if(!allzero){
-        downsample();
-        renderer.enableScissorTest(true);
-
-        renderer.setRenderTarget(renderTarget.col);
-        renderer.setViewport(currentpos.x,currentpos.y,tiles,tiles);
-        renderer.setScissor(currentpos.x,currentpos.y,tiles,tiles);
-        renderer.render( orthoscene, orthocam, renderTarget.col );
-
-        renderer.enableScissorTest(false);
-    }
-
-    //if(currentpos.y>100 && frame%100==0){}
-    //else
-    if(frame%10==0)
-    advancepos(tiles);
-    while(maps[1][currentpos.x][currentpos.y]==null)
-        advancepos(tiles);
+    downsample();
+    renderer.enableScissorTest(true);
+    renderer.setRenderTarget(renderTarget.col);
+    renderer.setViewport(currentpos.x,currentpos.y,tiles,tiles);
+    renderer.setScissor(currentpos.x,currentpos.y,tiles,tiles);
+    renderer.render( orthoscene, orthocam, renderTarget.col );
+    renderer.enableScissorTest(false);
     renderer.setViewport(0,0, window.innerWidth, window.innerHeight );
     renderer.render( scene, camera );
+
+    advancepos(tiles);
     frame++;
 }

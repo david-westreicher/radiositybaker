@@ -5,7 +5,7 @@ requirejs(
     [
         three+'build/three.js',
         threejs+'Detector.js',
-        threejs+'libs/stats.min.js',
+        threejs+'libs/stats.min.js'
     ],
     function(){
         console.log('all loaded');
