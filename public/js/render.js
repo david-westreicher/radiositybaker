@@ -6,7 +6,7 @@ var globalmaps = null;
 var size = 512;
 var tileSize = 16;
 var plane = null;
-var reflectivity = 0.8;
+var reflectivity = 0.9;
 
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
