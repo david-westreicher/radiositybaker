@@ -3,25 +3,26 @@ if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 var stats;
 var globalmaps = null;
 
-var size = 128;
-var tileSize = 16;
+var size = 512;
+var tileSize = 64;
 var plane = null;
 var reflectivity = 0.9;
 
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
     plane = new THREE.PlaneGeometry(10,10);
-    init(scenes.medium);
+    init(scenes.small);
     animate();
 });
 var radcam, camera, controls, radscene, scene, renderer,orthoscene;
 var renderTarget = {
-    size:64,
+    size:512,
     rt: null,
     col: null
 }
 var downsampler = [];
 var frame = 0;
+var pass = 0;
 var debugnum = 0;
 var currentpos = {x:0,y:0};
 var colmap = null;
@@ -214,6 +215,7 @@ function advancepos(tiles){
     if(currentpos.y>=size){
         currentpos.x = 0;
         currentpos.y = 0;
+        pass++;
     }
 }
 
@@ -240,7 +242,8 @@ function render() {
                 renderer.setViewport((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
                 renderer.setScissor((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
                 renderer.render( radscene, radcam, renderTarget.rt );
-                //scene.add(new THREE.ArrowHelper(maps[1][x][y], radcam.position, 2, 0xff0000 ));
+                //if(pass==0&& Math.random()>0.91)
+                    //scene.add(new THREE.ArrowHelper(maps[1][x][y], radcam.position, 2, 0xff0000 ));
                 allzero = false;
             }
         }
