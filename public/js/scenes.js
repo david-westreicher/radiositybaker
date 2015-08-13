@@ -61,13 +61,20 @@ function getgeoms3(material){
     newscene.push(cube);
     return newscene;
 }
+function getgeoms4(material){
+    var newscene = [];
+    var cube = new THREE.Mesh(new THREE.SphereGeometry(15,8,6),material);
+    newscene.push(cube);
+    return newscene;
+}
 
 var material = new THREE.MeshBasicMaterial({color:(Math.random()+0.9)*0xffffff});
 material = new THREE.MeshBasicMaterial();
 var scenes = {
     small: getgeoms(material),
     medium: getgeoms2(material),
-    large: getgeoms3(material)
+    large: getgeoms3(material),
+    ball: getgeoms4(material)
 }
 
 return scenes;

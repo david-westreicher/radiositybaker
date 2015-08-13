@@ -3,7 +3,7 @@ if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 var stats;
 var globalmaps = null;
 
-var size = 512;
+var size = 128;
 var tileSize = 16;
 var plane = null;
 var reflectivity = 0.9;
@@ -11,12 +11,12 @@ var reflectivity = 0.9;
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
     plane = new THREE.PlaneGeometry(10,10);
-    init(scenes.small);
+    init(scenes.ball);
     animate();
 });
 var radcam, camera, controls, radscene, scene, renderer,orthoscene;
 var renderTarget = {
-    size:512,
+    size:256,
     rt: null,
     col: null
 }
@@ -64,8 +64,7 @@ function createDownSampler(scene){
     var num = 0;
     while(currentSize>renderTarget.size/tileSize){
         currentSize/=2;
-        var rt = new THREE.WebGLRenderTarget(currentSize,currentSize, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat } );
-        rt.generateMipmaps = true;
+        var rt = new THREE.WebGLRenderTarget(currentSize,currentSize, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } );
 
         var dsscene = new THREE.Scene();
         var rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: (num==0?renderTarget.rt:downsampler[downsampler.length-1].rt)}));
@@ -145,13 +144,12 @@ function createShader(){
 
 function init(cubes) {
 
-
-
     //var filter = THREE.NearestFilter;
-    var filter = THREE.LinearFilter;
-    renderTarget.col = new THREE.WebGLRenderTarget(size,size, { minFilter: filter , magFilter: filter, format: THREE.RGBFormat } );
+    var nearest = THREE.NearestFilter;
+    var linear = THREE.LinearFilter;
+    renderTarget.col = new THREE.WebGLRenderTarget(size,size, { minFilter: nearest , magFilter: linear, format: THREE.RGBFormat } );
 
-    renderTarget.rt = new THREE.WebGLRenderTarget(renderTarget.size,renderTarget.size, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat } );
+    renderTarget.rt = new THREE.WebGLRenderTarget(renderTarget.size,renderTarget.size, { minFilter: linear, magFilter: linear, format: THREE.RGBFormat } );
 
     camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 500 );
     radcam = new THREE.PerspectiveCamera( 90, 1, 0.1, 100 );
@@ -166,7 +164,6 @@ function init(cubes) {
     var rendertotexplane = new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map: downsampler[downsampler.length-1].rt}));
     rendertotexplane.material.side = THREE.DoubleSide;
     orthoscene.add(rendertotexplane);
-    //orthoscene.add(new THREE.Mesh(new THREE.BoxGeometry(2,2,2),new THREE.MeshBasicMaterial({color:0x00ff00})));
 
     var finalgeom = createScene(scene,cubes);
     createcolmap();
@@ -181,7 +178,7 @@ function init(cubes) {
     radscene.add(new THREE.Mesh(finalgeom, shader));
     radscene.add(new THREE.Mesh(finalgeom,new THREE.MeshBasicMaterial({color:0x000000, side:THREE.BackSide})));
 
-    renderer = new THREE.WebGLRenderer( { antialias: true } );
+    renderer = new THREE.WebGLRenderer();
     renderer.setClearColor(0xffffff);
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize( window.innerWidth, window.innerHeight );
@@ -236,8 +233,10 @@ function render() {
 
     var maps = globalmaps.maps;
     var tiles = renderTarget.size/tileSize;
+    renderer.setPixelRatio(1);
+
+    if(frame%1==0){
     renderer.enableScissorTest(true);
-    
     var allzero = true;
     while(allzero){
         for(var x = currentpos.x;x<size && x<currentpos.x+tiles;x++){
@@ -253,6 +252,7 @@ function render() {
                 renderer.setViewport((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
                 renderer.setScissor((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
                 renderer.render( radscene, radcam, renderTarget.rt );
+                //scene.add(new THREE.ArrowHelper(maps[1][x][y], radcam.position, 2, 0xff0000 ));
                 allzero = false;
             }
         }
@@ -268,9 +268,14 @@ function render() {
     renderer.setScissor(currentpos.x,currentpos.y,tiles,tiles);
     renderer.render( orthoscene, orthocam, renderTarget.col );
     renderer.enableScissorTest(false);
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setViewport(0,0, window.innerWidth, window.innerHeight );
     renderer.render( scene, camera );
 
     advancepos(tiles);
+    }
+    else
+        renderer.render( scene, camera );
+
     frame++;
 }
