@@ -11,12 +11,12 @@ var reflectivity = 0.9;
 require(['js/maps.js','js/scenes.js'],function(map,scenes){
     globalmaps = new map(size);
     plane = new THREE.PlaneGeometry(10,10);
-    init(scenes.ball);
+    init(scenes.medium);
     animate();
 });
 var radcam, camera, controls, radscene, scene, renderer,orthoscene;
 var renderTarget = {
-    size:256,
+    size:64,
     rt: null,
     col: null
 }
@@ -25,28 +25,6 @@ var frame = 0;
 var debugnum = 0;
 var currentpos = {x:0,y:0};
 var colmap = null;
-
-function flatten(v1,v2,v3){
-    /*
-                     d12
-       v1 = (0,0) o-------o v2 = (d12,0)
-                   \     /
-              d13   \   /  d23
-                     \ /
-                      o
-
-                   v3 = (x,y)
-    */
-    var d12 = v1.distanceTo(v2);
-    var d13 = v1.distanceTo(v3);
-    var d23 = v2.distanceTo(v3);
-    var x = (d23*d23-d13*d13-d12*d12)/(-2.0*d12);
-    var y = Math.sqrt(d13*d13-x*x);
-    var v1p = new THREE.Vector3(0,0,0);
-    var v2p = new THREE.Vector3(d12,0,0);
-    var v3p = new THREE.Vector3(x,y,0);
-    return [v1p,v2p,v3p];
-}
 
 function colToVec(col){
     return new THREE.Vector3(col.r,col.g,col.b);
@@ -76,21 +54,31 @@ function createDownSampler(scene){
     }
 }
 
+function transformNormals(normMatrix,norms){
+    var result = [];
+    norms.forEach(function(norm){
+        var n = new THREE.Vector3().copy(norm).applyMatrix4(normMatrix);
+        result.push(n);
+    });
+    return result;
+}
+
 function createScene(scene,newscene){
 
     var finalgeom = new THREE.Geometry();
     var cubenum = 0;
     newscene.forEach(function(cube){
         cube.updateMatrixWorld(true);
+        var normMatrix = new THREE.Matrix4().getInverse(cube.matrix).transpose();
         var geom = cube.geometry;
         var verts = geom.vertices;
         geom.faces.forEach(function(face){
             var v1 = new THREE.Vector3().copy(verts[face.a]);cube.localToWorld(v1);
             var v2 = new THREE.Vector3().copy(verts[face.b]);cube.localToWorld(v2);
             var v3 = new THREE.Vector3().copy(verts[face.c]);cube.localToWorld(v3);
+            var norms = transformNormals(normMatrix,face.vertexNormals);
 
-            var newtri = flatten(v1,v2,v3);
-            var plotresult = globalmaps.plotIntoMaps(newtri,[v1,v2,v3],colToVec(cube.material.color));
+            var plotresult = globalmaps.plotIntoMaps([v1,v2,v3],norms,colToVec(cube.material.color));
 
             var vertnum = finalgeom.vertices.length;
             finalgeom.faces.push(new THREE.Face3(vertnum,vertnum+1,vertnum+2));
