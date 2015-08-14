@@ -114,7 +114,7 @@ var maps = function(size){
         }
     }
 
-    self.genOccupyMap = function(width,height,space,bbox,tri,offset){
+    self.genOccupyMap = function(width,height,space,tri,offset){
         var result = new Array(width);
         for(var sx=0;sx<width;sx++){
             result[sx] = new Array(height);
@@ -124,7 +124,9 @@ var maps = function(size){
         
         //conservative triangle rasterization
         var onTraverse = function(x,y){
-            result[x+offset][y+offset] = true;
+            x = Math.ceil(x+offset);
+            y = Math.ceil(y+offset);
+            result[x][y] = true;
         }
         self.rayTraversal(tri.a,tri.b,onTraverse);
         self.rayTraversal(tri.a,tri.c,onTraverse);
@@ -149,7 +151,7 @@ var maps = function(size){
         }
 
         var c = self.copyArray(result);
-
+//if(false)
         for(var passes = 0;passes<1;passes++){
             for(var sx=0;sx<width;sx++)
                 for(var sy=0;sy<height;sy++){
@@ -179,7 +181,19 @@ var maps = function(size){
     }
 
     self.plotIntoMaps = function(verts,normals,col){
+        var offset = 2;
         var newtri = self.flatten(verts[0],verts[1],verts[2]);
+        var tempgeom = new THREE.Geometry();
+        newtri.forEach(function(vert){
+            tempgeom.vertices.push(vert);
+        });
+        tempgeom.computeBoundingBox();
+        var bbox = tempgeom.boundingBox;
+        newtri.forEach(function(vert){
+            vert.x-=bbox.min.x;
+        });
+        var width = Math.ceil(bbox.max.x-bbox.min.x)+offset*2;
+        var height = Math.ceil(bbox.max.y-bbox.min.y)+offset*2;
         var tri = new THREE.Triangle(newtri[0],newtri[1],newtri[2]);
         var space = null;
         var uvs = [];
@@ -199,21 +213,12 @@ var maps = function(size){
                 uvs.push(new THREE.Vector2(newtri[i].x+space[0]+1.5,newtri[i].y+space[1]+1.5).multiplyScalar(1/self.size));
             return {space:space,uvs:uvs};
         }
-        var offset = 2;
-        var tempgeom = new THREE.Geometry();
-        newtri.forEach(function(vert){
-            tempgeom.vertices.push(vert);
-        });
-        tempgeom.computeBoundingBox();
-        var bbox = tempgeom.boundingBox;
-        var width = Math.ceil(bbox.max.x-bbox.min.x)+offset*2;
-        var height = Math.ceil(bbox.max.y-bbox.min.y)+offset*2;
         space = self.findSpace(width,height);
-        var shouldoccupy = self.genOccupyMap(width,height,space,bbox,tri,offset);
+        var shouldoccupy = self.genOccupyMap(width,height,space,tri,offset);
         for(var sx=0;sx<width;sx++)
             for(var sy=0;sy<height;sy++){
-                var x = sx+bbox.min.x-offset;
-                var y = sy+bbox.min.y-offset;
+                var x = sx-offset;
+                var y = sy-offset;
                 var arrx = space[0]+sx;
                 var arry = space[1]+sy;
                 var pos = new THREE.Vector3(x,y,0);

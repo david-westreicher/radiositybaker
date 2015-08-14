@@ -8,12 +8,25 @@ var tileSize = 16;
 var plane = null;
 var reflectivity = 0.9;
 
-require(['js/maps.js','js/scenes.js'],function(map,scenes){
-    globalmaps = new map(size);
-    plane = new THREE.PlaneGeometry(10,10);
-    init(scenes.small);
-    animate();
-});
+var loader = new THREE.JSONLoader();
+loader.load(
+    'obj/monster.js',
+    function ( geometry, materials ) {
+        var newscene = [];
+        var material = new THREE.MeshBasicMaterial();
+        var object = new THREE.Mesh( geometry, material );
+        object.scale.set(0.02,0.02,0.02)
+        console.log('monster loaded');
+        newscene.push( object );
+        require(['js/maps.js','js/scenes.js'],function(map,scenes){
+            globalmaps = new map(size);
+            plane = new THREE.PlaneGeometry(10,10);
+            init(scenes.small);
+            animate();
+        });
+    }
+);
+
 var radcam, camera, controls, radscene, scene, renderer,orthoscene;
 var renderTarget = {
     size:256,
@@ -141,7 +154,7 @@ function init(cubes) {
     renderTarget.rt = new THREE.WebGLRenderTarget(renderTarget.size,renderTarget.size, { minFilter: linear, magFilter: linear, format: THREE.RGBFormat } );
 
     camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 500 );
-    radcam = new THREE.PerspectiveCamera( 90, 1, 0.1, 100 );
+    radcam = new THREE.PerspectiveCamera( 90, 1, 0.2, 100 );
     orthocam = new THREE.OrthographicCamera(-5,5,5,-5,-1,1);
     camera.position.z = 30;
     controls = new THREE.OrbitControls( camera );
