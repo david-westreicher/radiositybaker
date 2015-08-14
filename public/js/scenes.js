@@ -35,7 +35,7 @@ function getgeoms(material){
         material = new THREE.MeshBasicMaterial({color:Math.random()*0xffffff});
         //cube = new THREE.Mesh(new THREE.SphereGeometry(size/10,8,6),material);
         //cube = new THREE.Mesh(new THREE.DodecahedronGeometry(size/10),material);
-        cube = new THREE.Mesh(new THREE.IcosahedronGeometry(size/10,1),material);
+        cube = new THREE.Mesh(new THREE.IcosahedronGeometry(size/10+i,1),material);
         cube.position.x = Math.random()*size*2-size;
         cube.position.y = Math.random()*size*2-size;
         cube.position.z = Math.random()*size*2-size;
@@ -46,7 +46,7 @@ function getgeoms(material){
 
 function getgeoms2(material){
     var newscene = [];
-    var s = 30;
+    var s = 10;
     material = new THREE.MeshBasicMaterial({color:(Math.random()+0.9)*0xffffff});
     var cube = new THREE.Mesh(new THREE.PlaneGeometry(s,s),material);
     cube.rotation.x = -Math.PI/2;
@@ -67,17 +67,17 @@ function getgeoms3(material){
 function getgeoms4(material){
     var newscene = [];
     //var cube = new THREE.Mesh(new THREE.DodecahedronGeometry(10),material);
-    var cube = new THREE.Mesh(new THREE.IcosahedronGeometry(10,1),material);
+    var cube = new THREE.Mesh(new THREE.IcosahedronGeometry(1,1),material);
     newscene.push(cube);
     cube = new THREE.Mesh(new THREE.BoxGeometry(40,40,1),material);
     cube.position.z = -15;
-    newscene.push(cube);
+    //newscene.push(cube);
     return newscene;
 }
 function tesstest(material){
     var newscene = [];
     var geom = new THREE.Geometry();
-    var size = 10;
+    var size = 1;
     geom.vertices.push(new THREE.Vector3(0,0,0));
     geom.vertices.push(new THREE.Vector3(0,0,size));
     geom.vertices.push(new THREE.Vector3(size,0,0));

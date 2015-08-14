@@ -96,43 +96,79 @@ var maps = function(size){
         return copy;
     }
 
-    self.genOccupyMap = function(width,height,space,bbox,newtri,offset){
-        var tri = new THREE.Triangle(newtri[0],newtri[1],newtri[2]);
-        var neighs = [[0,1],[1,0],[0,-1],[-1,0]];
+
+    self.rayTraversal = function(from,to,onT){
+        var x0 = from.x, x1 = to.x,
+            y0 = from.y, y1 = to.y;
+        const dx = x1 - x0,
+        dy = y1 - y0,
+        s  = Math.abs(dx) > Math.abs(dy) ? Math.abs(dx) : Math.abs(dy),
+        xi = dx * 1.0 / s,
+        yi = dy * 1.0 / s;
+        var x  = x0,
+            y  = y0;
+        for (var i = 0; i < s; i++) {
+            onT(Math.round(x),Math.round(y));
+            x += xi;
+            y += yi;
+        }
+    }
+
+    self.genOccupyMap = function(width,height,space,bbox,tri,offset){
         var result = new Array(width);
         for(var sx=0;sx<width;sx++){
             result[sx] = new Array(height);
+            for(var sy=0;sy<height;sy++)
+                result[sx][sy] = false;
+        }
+        
+        //conservative triangle rasterization
+        var onTraverse = function(x,y){
+            result[x+offset][y+offset] = true;
+        }
+        self.rayTraversal(tri.a,tri.b,onTraverse);
+        self.rayTraversal(tri.a,tri.c,onTraverse);
+        self.rayTraversal(tri.b,tri.c,onTraverse);
+
+        //scanline
+        for(var sx=0;sx<width;sx++){
+            var start = -1;
             for(var sy=0;sy<height;sy++){
-                var x = sx+bbox.min.x-offset;
-                var y = sy+bbox.min.y-offset;
-                var arrx = space[0]+sx;
-                var arry = space[1]+sy;
-                var pos = new THREE.Vector3(x,y,0);
-                var bary = tri.barycoordFromPoint(pos);
-                if(bary.x<0||bary.y<0||bary.z<0)
-                    result[sx][sy] = false;
-                else
-                    result[sx][sy] = true;
+                if(start==-1){
+                    if(result[sx][sy])
+                        start = sy;
+                }else{
+                    if(result[sx][sy]){
+                        for(var fill = start;fill<sy;fill++){
+                            result[sx][fill] = true;
+                        }
+                        start = -1;
+                    }
+                }
             }
         }
+
         var c = self.copyArray(result);
-        //if(false)
-        for(var passes = 0;passes<3;passes++){
+
+        for(var passes = 0;passes<1;passes++){
             for(var sx=0;sx<width;sx++)
                 for(var sy=0;sy<height;sy++){
                     if(result[sx][sy]){
                         c[sx][sy] = true;
                         continue;
                     }
-                    for(var n = 0;n<4;n++){
-                        var x = sx+neighs[n][0];
-                        var y = sy+neighs[n][1];
+                    for(var nx = -1;nx<=1;nx++){
+                    for(var ny = -1;ny<=1;ny++){
+                        if(nx==0 && ny==0)
+                            continue;
+                        var x = sx+nx;
+                        var y = sy+ny;
                         if(x>=0&&x<width&&y>=0&&y<height&&result[x][y]){
                             c[sx][sy] = true;
                             //result[sx][sy] = true;
                             break;
                         }
-                    }
+                    }}
                 }
             var tmp = c;
             c = result;
@@ -144,6 +180,25 @@ var maps = function(size){
 
     self.plotIntoMaps = function(verts,normals,col){
         var newtri = self.flatten(verts[0],verts[1],verts[2]);
+        var tri = new THREE.Triangle(newtri[0],newtri[1],newtri[2]);
+        var space = null;
+        var uvs = [];
+        if(tri.area()<1){
+            space = self.findSpace(3,3);
+            var realtri = new THREE.Triangle(verts[0],verts[1],verts[2]);
+            var norm = realtri.normal();
+            var mid = realtri.midpoint();
+            for(var sx=0;sx<3;sx++)
+                for(var sy=0;sy<3;sy++){
+                    self.maps[0][space[0]+sx][space[1]+sy] = mid;
+                    self.maps[1][space[0]+sx][space[1]+sy] = norm; 
+                    self.maps[2][space[0]+sx][space[1]+sy] = col;
+                }
+
+            for(var i=0;i<3;i++)
+                uvs.push(new THREE.Vector2(newtri[i].x+space[0]+1.5,newtri[i].y+space[1]+1.5).multiplyScalar(1/self.size));
+            return {space:space,uvs:uvs};
+        }
         var offset = 2;
         var tempgeom = new THREE.Geometry();
         newtri.forEach(function(vert){
@@ -153,9 +208,8 @@ var maps = function(size){
         var bbox = tempgeom.boundingBox;
         var width = Math.ceil(bbox.max.x-bbox.min.x)+offset*2;
         var height = Math.ceil(bbox.max.y-bbox.min.y)+offset*2;
-        var space = self.findSpace(width,height);
-        var uvs = [];
-        var shouldoccupy = self.genOccupyMap(width,height,space,bbox,newtri,offset);
+        space = self.findSpace(width,height);
+        var shouldoccupy = self.genOccupyMap(width,height,space,bbox,tri,offset);
         for(var sx=0;sx<width;sx++)
             for(var sy=0;sy<height;sy++){
                 var x = sx+bbox.min.x-offset;
@@ -163,9 +217,9 @@ var maps = function(size){
                 var arrx = space[0]+sx;
                 var arry = space[1]+sy;
                 var pos = new THREE.Vector3(x,y,0);
-                var bary = new THREE.Triangle(newtri[0],newtri[1],newtri[2]).barycoordFromPoint(pos);
-                //if(!shouldoccupy[sx][sy])
-                    //continue;
+                var bary = tri.barycoordFromPoint(pos);
+                if(!shouldoccupy[sx][sy])
+                    continue;
                 self.maps[0][space[0]+sx][space[1]+sy] = self.phongtess(bary,verts,normals);
                 //self.maps[0][space[0]+sx][space[1]+sy] = self.interpVals(bary,verts);
                 self.maps[1][space[0]+sx][space[1]+sy] = self.interpVals(bary,normals).normalize(); 
@@ -174,7 +228,7 @@ var maps = function(size){
             }
 
         for(var i=0;i<3;i++)
-            uvs.push(new THREE.Vector2(newtri[i].x+space[0]+2.5,newtri[i].y+space[1]+2.5).multiplyScalar(1/self.size));
+            uvs.push(new THREE.Vector2(newtri[i].x+space[0]+offset+.5,newtri[i].y+space[1]+offset+.5).multiplyScalar(1/self.size));
         return {space:space,uvs:uvs};
     }
 }

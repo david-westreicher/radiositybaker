@@ -4,7 +4,7 @@ var stats;
 var globalmaps = null;
 
 var size = 512;
-var tileSize = 64;
+var tileSize = 16;
 var plane = null;
 var reflectivity = 0.9;
 
@@ -16,7 +16,7 @@ require(['js/maps.js','js/scenes.js'],function(map,scenes){
 });
 var radcam, camera, controls, radscene, scene, renderer,orthoscene;
 var renderTarget = {
-    size:512,
+    size:256,
     rt: null,
     col: null
 }
@@ -242,8 +242,8 @@ function render() {
                 renderer.setViewport((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
                 renderer.setScissor((x-currentpos.x)*tileSize,(y-currentpos.y)*tileSize,tileSize,tileSize);
                 renderer.render( radscene, radcam, renderTarget.rt );
-                //if(pass==0&& Math.random()>0.91)
-                    //scene.add(new THREE.ArrowHelper(maps[1][x][y], radcam.position, 2, 0xff0000 ));
+                //if(pass==0&& Math.random()>0.985)
+                   //scene.add(new THREE.ArrowHelper(maps[1][x][y], radcam.position, 2, 0xff0000 ));
                 allzero = false;
             }
         }
